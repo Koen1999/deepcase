@@ -33,12 +33,12 @@ class Preprocessor(object):
         # Set required columns
         self.REQUIRED_COLUMNS = {'timestamp', 'event', 'machine'}
 
-
     ########################################################################
     #                      General data preprocessing                      #
     ########################################################################
 
-    def sequence(self, data, labels=None, verbose=False):
+    def sequence(self, data: pd.DataFrame, labels: [int or np.ndarray] = None, verbose: bool = False,
+                 prev_mapping: dict = None):
         """Transform pandas DataFrame into DeepCASE sequences.
 
             Parameters
@@ -53,6 +53,11 @@ class Preprocessor(object):
 
             verbose : boolean, default=False
                 If True, prints progress in transforming input to sequences.
+
+            prev_mapping: dict(), default=None
+                Already existing mapping from new event_id to original event_id.
+                Sequencing will use and extend this mapping if the argument is not
+                None.
 
             Returns
             -------
@@ -105,17 +110,28 @@ class Preprocessor(object):
         ################################################################
 
         # Create mapping of events
-        mapping = {
-            i: event for i, event in enumerate(np.unique(data['event'].values))
-        }
+        if prev_mapping is not None:
+            unique_events = np.unique(data['event'].values)
+            new_events = [event for event in unique_events if event not in prev_mapping.values()]
+            new_start = max(prev_mapping.keys())
+            mapping = prev_mapping
+            mapping.update({
+                i: event for i, event in enumerate(new_events, new_start + 1)
+            })
+        else:
+            mapping = {
+                i: event for i, event in enumerate(np.unique(data['event'].values))
+            }
 
-        # Check that NO_EVENT is not in events
-        if self.NO_EVENT in mapping.values():
+        # Check that NO_EVENT is not in events (only relevant if no previous mapping is present)
+        if self.NO_EVENT in mapping.values() and prev_mapping is None:
             raise ValueError(
                 "NO_EVENT ('{}') is also a valid Event ID".format(self.NO_EVENT)
             )
+        elif self.NO_EVENT not in mapping.values():
+            # Only add in NO_EVENT when not already present in previous mapping
+            mapping[len(mapping)] = self.NO_EVENT
 
-        mapping[len(mapping)] = self.NO_EVENT
         mapping_inverse = {v: k for k, v in mapping.items()}
 
         # Apply mapping
@@ -202,7 +218,7 @@ class Preprocessor(object):
     #                     Preprocess different formats                     #
     ########################################################################
 
-    def csv(self, path, nrows=None, labels=None, verbose=False):
+    def csv(self, path, nrows=None, labels=None, verbose=False, prev_mapping=None):
         """Preprocess data from csv file.
 
             Note
@@ -228,6 +244,11 @@ class Preprocessor(object):
             verbose : boolean, default=False
                 If True, prints progress in transforming input to sequences.
 
+            prev_mapping: dict(), default=None
+                Already existing mapping from new event_id to original event_id.
+                Sequencing will use and extend this mapping if the argument is not
+                None.
+
             Returns
             -------
             events : torch.Tensor of shape=(n_samples,)
@@ -252,10 +273,10 @@ class Preprocessor(object):
         data = pd.read_csv(path, nrows=nrows)
 
         # Transform to sequences and return
-        return self.sequence(data, labels=labels, verbose=verbose)
+        return self.sequence(data, labels=labels, verbose=verbose, prev_mapping=prev_mapping)
 
 
-    def json(self, path, labels=None, verbose=False):
+    def json(self, path, labels=None, verbose=False, prev_mapping=None):
         """Preprocess data from json file.
 
             Note
@@ -274,6 +295,11 @@ class Preprocessor(object):
 
             verbose : boolean, default=False
                 If True, prints progress in transforming input to sequences.
+
+            prev_mapping: dict(), default=None
+                Already existing mapping from new event_id to original event_id.
+                Sequencing will use and extend this mapping if the argument is not
+                None.
 
             Returns
             -------
@@ -298,7 +324,7 @@ class Preprocessor(object):
         raise NotImplementedError("Parsing '.json' not yet implemented.")
 
 
-    def ndjson(self, path, labels=None, verbose=False):
+    def ndjson(self, path, labels=None, verbose=False, prev_mapping=None):
         """Preprocess data from ndjson file.
 
             Note
@@ -317,6 +343,11 @@ class Preprocessor(object):
 
             verbose : boolean, default=False
                 If True, prints progress in transforming input to sequences.
+
+            prev_mapping: dict(), default=None
+                Already existing mapping from new event_id to original event_id.
+                Sequencing will use and extend this mapping if the argument is not
+                None.
 
             Returns
             -------
@@ -341,7 +372,7 @@ class Preprocessor(object):
         raise NotImplementedError("Parsing '.ndjson' not yet implemented.")
 
 
-    def text(self, path, nrows=None, labels=None, verbose=False):
+    def text(self, path, nrows=None, labels=None, verbose=False, prev_mapping=None):
         """Preprocess data from text file.
 
             Note
@@ -365,6 +396,11 @@ class Preprocessor(object):
 
             verbose : boolean, default=False
                 If True, prints progress in transforming input to sequences.
+
+            prev_mapping: dict(), default=None
+                Already existing mapping from new event_id to original event_id.
+                Sequencing will use and extend this mapping if the argument is not
+                None.
 
             Returns
             -------
@@ -414,7 +450,7 @@ class Preprocessor(object):
         })
 
         # Transform to sequences and return
-        return self.sequence(data, labels=labels, verbose=verbose)
+        return self.sequence(data, labels=labels, verbose=verbose, prev_mapping=prev_mapping)
 
 
 if __name__ == "__main__":
