@@ -192,7 +192,7 @@ class Preprocessor(object):
                 # Compute time difference between context and event
                 time_diff = timestamps[i+1:] - timestamps[:-i-1]
                 # Check if time difference is larger than threshold
-                timeout_mask = time_diff > self.timeout
+                timeout_mask = time_diff.astype(int) > self.timeout
 
                 # Set mask to NO_EVENT
                 machine_context[i+1:, self.context_length-i-1] = np.where(
